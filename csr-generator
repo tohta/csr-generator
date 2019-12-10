@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+
+SSLHOST=$1
+if [ -z $1 ]; then
+	echo "No Hostname defined."
+	exit;
+fi
+
+PASSWD_TMP='hogehoge'
+
+ADDRESS=("JP" "Tokyo" "Minato-ku" "YOUR_COMPANY" "YOUR_NAME@EXAMPLE.COM")
+
+
+echo -n "Generating key and csr for \"${SSLHOST}\"..."
+
+expect -c "
+	set timeout 5
+	spawn openssl genrsa -aes256 -out ${SSLHOST}.temp 2048
+	expect \"Enter pass phrase for\"
+	send \"${PASSWD_TMP}\n\"
+	expect \"Verifying\"
+	send \"${PASSWD_TMP}\n\"
+
+	spawn openssl rsa -in ${SSLHOST}.temp -out ${SSLHOST}.key
+	expect \"Enter pass phrase\"
+	send \"${PASSWD_TMP}\n\"
+
+	spawn openssl req -new -sha256 -key ${SSLHOST}.key -out ${SSLHOST}.csr
+	expect \"Country Name\"
+	send \"${COUTRY_NAME:-${ADDRESS[0]}}\n\"
+
+	expect \"State or Province Name\"
+	send \"${STATE_NAME:-${ADDRESS[1]}}\n\"
+
+	expect \"Locality Name\"
+	send \"${LOCALITY_NAME:-${ADDRESS[2]}}\n\"
+
+	expect \"Organization Name\"
+	send \"${ORG_NAME:-${ADDRESS[3]}}\n\"
+
+	expect \"Organizational Unit Name\"
+	send \"\n\"
+
+	expect \"Common Name\"
+	send \"${SSLHOST}\n\"
+
+	expect \"Email Address\"
+	send \"${EMAIL:-${ADDRESS[4]}}\n\"
+
+	expect \"A challenge password\"
+	send \"\n\"
+
+	expect \"An optional company name\"
+	send \"\n\"
+	interact
+"
+
+# generate self-signed certificate
+echo "Generating self-signed certificate..."
+openssl x509 -days 3650 -req -signkey ${SSLHOST}.key < ${SSLHOST}.csr > ${SSLHOST}.crt.self-signed
+
+echo "Finished."
